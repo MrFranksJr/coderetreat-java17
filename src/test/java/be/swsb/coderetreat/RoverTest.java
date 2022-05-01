@@ -30,6 +30,17 @@ public class RoverTest {
     }
 
     @Test
+    void aRoverCanReportMultipleUnknownCommands() {
+        final var rover = Rover.defaultRover();
+
+        final var errorredRover = rover.receive("r,r,snarf,r,lion-o");
+        assertThat(errorredRover).isEqualTo(Rover.initialRover(new Vector(0, 0), WEST));
+        assertThat(errorredRover.report())
+                .contains("Could not parse [snarf] as a known command")
+                .contains("Could not parse [lion-o] as a known command");
+    }
+
+    @Test
     void roverCanTurnRight() {
         final var rover = Rover.defaultRover();
 

@@ -2,40 +2,43 @@ package be.swsb.coderetreat.rover;
 
 import be.swsb.coderetreat.vector.Vector;
 
-import java.util.Arrays;
-import java.util.Objects;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static be.swsb.coderetreat.rover.Orientation.*;
+import static java.util.Collections.emptyList;
 
 public class Rover {
     private final Vector position;
     private final Orientation orientation;
-    private final String error;
+    private final List<String> errors;
 
-    private Rover(Vector position, Orientation orientation, String error) {
+    private Rover(Vector position, Orientation orientation, List<String> errors) {
         this.position = position;
         this.orientation = orientation;
-        this.error = error;
+        this.errors = List.copyOf(errors);
     }
 
     public static Rover initialRover(Vector position, Orientation orientation) {
-        return new Rover(position, orientation, null);
+        return new Rover(position, orientation, emptyList());
     }
 
     public static Rover defaultRover() {
-        return new Rover(new Vector(0,0), NORTH, null);
+        return new Rover(new Vector(0,0), NORTH, emptyList());
     }
 
     private static Rover error(Rover rover, String error) {
-        return new Rover(rover.position, rover.orientation, error);
+        final var errors = new ArrayList<>(rover.errors);
+        errors.add(error);
+        return new Rover(rover.position, rover.orientation, errors);
     }
 
     private static Rover turn(Rover rover, Orientation orientation) {
-        return new Rover(rover.position, orientation, rover.error);
+        return new Rover(rover.position, orientation, rover.errors);
     }
 
     private static Rover move(Rover rover, Vector position) {
-        return new Rover(position, rover.orientation, rover.error);
+        return new Rover(position, rover.orientation, rover.errors);
     }
 
     public Rover receive(String commands) {
@@ -46,7 +49,7 @@ public class Rover {
     }
 
     public String report() {
-        return error;
+        return String.join("\n", errors);
     }
 
     private Rover receive(Command command) {
