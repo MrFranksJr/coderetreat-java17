@@ -3,42 +3,54 @@ package be.swsb.coderetreat.rover;
 import be.swsb.coderetreat.vector.Vector;
 
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.function.Function;
 
-import static be.swsb.coderetreat.rover.Orientation.*;
+import static be.swsb.coderetreat.rover.Orientation.NORTH;
 import static java.util.Collections.emptyList;
 
 public class Rover {
     private final Vector position;
     private final Orientation orientation;
     private final List<String> errors;
+    private final Function<Rover, Optional<String>> obstacleScanner;
+    private final Obstacle obstacle;
 
-    private Rover(Vector position, Orientation orientation, List<String> errors) {
+    private Rover(Vector position, Orientation orientation, List<String> errors, Function<Rover, Optional<String>> scanner, Obstacle obstacle) {
         this.position = position;
         this.orientation = orientation;
         this.errors = List.copyOf(errors);
+        this.obstacleScanner = scanner;
+        this.obstacle = obstacle;
     }
 
     public static Rover initialRover(Vector position, Orientation orientation) {
-        return new Rover(position, orientation, emptyList());
+        return new Rover(position, orientation, emptyList(), r -> Optional.empty(), null);
     }
 
     public static Rover defaultRover() {
-        return new Rover(new Vector(0,0), NORTH, emptyList());
+        return new Rover(new Vector(0,0), NORTH, emptyList(), r -> Optional.empty(), null);
+    }
+
+    public static Rover aDefaultRoverWithScanner(Function<Rover, Optional<String>> scanner) {
+        return new Rover(new Vector(0,0), NORTH, emptyList(), scanner, null);
     }
 
     private static Rover error(Rover rover, String error) {
         final var errors = new ArrayList<>(rover.errors);
         errors.add(error);
-        return new Rover(rover.position, rover.orientation, errors);
+        return new Rover(rover.position, rover.orientation, errors, rover.obstacleScanner, null);
     }
 
     private static Rover turn(Rover rover, Orientation orientation) {
-        return new Rover(rover.position, orientation, rover.errors);
+        return new Rover(rover.position, orientation, rover.errors, rover.obstacleScanner, null);
     }
 
     private static Rover move(Rover rover, Vector position) {
-        return new Rover(position, rover.orientation, rover.errors);
+        return new Rover(position, rover.orientation, rover.errors, rover.obstacleScanner, null);
+    }
+
+    private static Rover stop(Rover rover, String obstacle) {
+        return new Rover(rover.position, rover.orientation, rover.errors, rover.obstacleScanner, Obstacle.of(obstacle));
     }
 
     public Rover receive(String commands) {
@@ -49,7 +61,13 @@ public class Rover {
     }
 
     public String report() {
-        return String.join("\n", errors);
+        final var messages = new ArrayList<>(errors);
+        Obstacle.asString(obstacle).map(messages::add);
+        return String.join("\n", messages);
+    }
+
+    public Optional<String> scan() {
+        return obstacleScanner.apply(this);
     }
 
     private Rover receive(Command command) {
@@ -105,7 +123,8 @@ public class Rover {
 
         final static class ForwardsCommand extends Command {
             Rover execute(Rover rover) {
-                return move(rover, rover.position.plus(asVector(rover.orientation)));
+                return rover.scan().map(scanResult -> stop(rover, scanResult))
+                        .orElse(move(rover, rover.position.plus(asVector(rover.orientation))));
             }
         }
 

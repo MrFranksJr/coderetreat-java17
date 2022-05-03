@@ -5,6 +5,8 @@ import be.swsb.coderetreat.rover.Rover;
 import be.swsb.coderetreat.vector.Vector;
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
+
 import static be.swsb.coderetreat.rover.Orientation.*;
 import static be.swsb.coderetreat.rover.Orientation.EAST;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -19,27 +21,6 @@ public class RoverTest {
 
         assertThat(rover).isEqualTo(defaultRover);
     }
-
-    @Test
-    void aRoverExecutesCommandsAsLongAsItUnderstandsThem() {
-        final var rover = Rover.defaultRover();
-
-        final var errorredRover = rover.receive("r,r,snarf,r");
-        assertThat(errorredRover).isEqualTo(Rover.initialRover(new Vector(0, 0), WEST));
-        assertThat(errorredRover.report()).isEqualTo("Could not parse [snarf] as a known command");
-    }
-
-    @Test
-    void aRoverCanReportMultipleUnknownCommands() {
-        final var rover = Rover.defaultRover();
-
-        final var errorredRover = rover.receive("r,r,snarf,r,lion-o");
-        assertThat(errorredRover).isEqualTo(Rover.initialRover(new Vector(0, 0), WEST));
-        assertThat(errorredRover.report())
-                .contains("Could not parse [snarf] as a known command")
-                .contains("Could not parse [lion-o] as a known command");
-    }
-
     @Test
     void roverCanTurnRight() {
         final var rover = Rover.defaultRover();
@@ -84,5 +65,31 @@ public class RoverTest {
         assertThat(rover.receive("l,b")).isEqualTo(Rover.initialRover(new Vector(1,0), WEST));
     }
 
+    @Test
+    void aRoverExecutesCommandsAsLongAsItUnderstandsThem() {
+        final var rover = Rover.defaultRover();
+
+        final var errorredRover = rover.receive("r,r,snarf,r");
+        assertThat(errorredRover).isEqualTo(Rover.initialRover(new Vector(0, 0), WEST));
+        assertThat(errorredRover.report()).isEqualTo("Could not parse [snarf] as a known command");
+    }
+
+    @Test
+    void aRoverCanReportMultipleUnknownCommands() {
+        final var rover = Rover.defaultRover();
+
+        final var errorredRover = rover.receive("r,r,snarf,r,lion-o");
+        assertThat(errorredRover).isEqualTo(Rover.initialRover(new Vector(0, 0), WEST));
+        assertThat(errorredRover.report())
+                .contains("Could not parse [snarf] as a known command")
+                .contains("Could not parse [lion-o] as a known command");
+    }
+
+    @Test
+    void aRoverCanReportOnObstacles() {
+        final var rover = Rover.aDefaultRoverWithScanner(r -> Optional.of("big crater"));
+
+        assertThat(rover.receive("f").report()).contains("There's a big crater! Ignoring other commands");
+    }
 }
 
