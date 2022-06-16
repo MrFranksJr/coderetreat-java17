@@ -15,7 +15,11 @@ public class Rover {
     private final Function<Rover, Optional<String>> obstacleScanner;
     private final Obstacle obstacle;
 
-    private Rover(Vector position, Orientation orientation, List<String> errors, Function<Rover, Optional<String>> scanner, Obstacle obstacle) {
+    private Rover(Vector position,
+                  Orientation orientation,
+                  List<String> errors,
+                  Function<Rover, Optional<String>> scanner, //TODO turn into functional interface
+                  Obstacle obstacle) {
         this.position = position;
         this.orientation = orientation;
         this.errors = List.copyOf(errors);
@@ -28,29 +32,30 @@ public class Rover {
     }
 
     public static Rover defaultRover() {
-        return new Rover(new Vector(0,0), NORTH, emptyList(), r -> Optional.empty(), null);
+        return new Rover(new Vector(0, 0), NORTH, emptyList(), r -> Optional.empty(), null);
     }
 
     public static Rover aDefaultRoverWithScanner(Function<Rover, Optional<String>> scanner) {
-        return new Rover(new Vector(0,0), NORTH, emptyList(), scanner, null);
+        return new Rover(new Vector(0, 0), NORTH, emptyList(), scanner, null);
     }
 
     private static Rover error(Rover rover, String error) {
         final var errors = new ArrayList<>(rover.errors);
         errors.add(error);
-        return new Rover(rover.position, rover.orientation, errors, rover.obstacleScanner, null);
+        return new Rover(rover.position, rover.orientation, errors, rover.obstacleScanner, rover.obstacle);
     }
 
     private static Rover turn(Rover rover, Orientation orientation) {
-        return new Rover(rover.position, orientation, rover.errors, rover.obstacleScanner, null);
+        return new Rover(rover.position, orientation, rover.errors, rover.obstacleScanner, rover.obstacle);
     }
 
     private static Rover move(Rover rover, Vector position) {
-        return new Rover(position, rover.orientation, rover.errors, rover.obstacleScanner, null);
+        return new Rover(position, rover.orientation, rover.errors, rover.obstacleScanner, rover.obstacle);
     }
 
     private static Rover stop(Rover rover, String obstacle) {
-        return new Rover(rover.position, rover.orientation, rover.errors, rover.obstacleScanner, Obstacle.of(obstacle));
+        final var error = error(rover, Obstacle.of(obstacle).asString());
+        return new Rover(error.position, error.orientation, error.errors, error.obstacleScanner, Obstacle.of(obstacle));
     }
 
     public Rover receive(String commands) {
@@ -62,7 +67,6 @@ public class Rover {
 
     public String report() {
         final var messages = new ArrayList<>(errors);
-        Obstacle.asString(obstacle).map(messages::add);
         return String.join("\n", messages);
     }
 
@@ -71,7 +75,9 @@ public class Rover {
     }
 
     private Rover receive(Command command) {
-        return command.execute(this);
+        return (this.obstacle == null)
+                ? command.execute(this)
+                : new Ignored(command).execute(this);
     }
 
     @Override
@@ -99,47 +105,12 @@ public class Rover {
 
         abstract Rover execute(Rover rover);
 
-        final static class UnknownCommand extends Command {
-            private final String error;
-            UnknownCommand(String unknownCmd) {
-                this.error = "Could not parse [" + unknownCmd + "] as a known command";
-            }
-            Rover execute(Rover rover) {
-                return error(rover, error);
-            }
-        }
-
-        final static class TurnRight extends Command {
-            Rover execute(Rover rover) {
-                return turn(rover, rover.orientation.turnRight());
-            }
-        }
-
-        final static class TurnLeft extends Command {
-            Rover execute(Rover rover) {
-                return turn(rover, rover.orientation.turnLeft());
-            }
-        }
-
-        final static class ForwardsCommand extends Command {
-            Rover execute(Rover rover) {
-                return rover.scan().map(scanResult -> stop(rover, scanResult))
-                        .orElse(move(rover, rover.position.plus(asVector(rover.orientation))));
-            }
-        }
-
-        final static class BackwardsCommand extends Command {
-            Rover execute(Rover rover) {
-                return move(rover, rover.position.plus(asVector(rover.orientation).reversed()));
-            }
-        }
-
         protected Vector asVector(Orientation orientation) {
             return switch (orientation) {
-                case NORTH -> new Vector(0,1);
-                case EAST -> new Vector(1,0);
-                case SOUTH -> new Vector(0,-1);
-                case WEST -> new Vector(-1,0);
+                case NORTH -> new Vector(0, 1);
+                case EAST -> new Vector(1, 0);
+                case SOUTH -> new Vector(0, -1);
+                case WEST -> new Vector(-1, 0);
             };
         }
 
@@ -147,10 +118,92 @@ public class Rover {
             return switch (cmd.toLowerCase()) {
                 case "r" -> new TurnRight();
                 case "l" -> new TurnLeft();
-                case "f" -> new ForwardsCommand();
-                case "b" -> new BackwardsCommand();
+                case "f" -> new Forwards();
+                case "b" -> new Backwards();
                 default -> new UnknownCommand(cmd);
             };
+        }
+
+        protected abstract String asString();
+    }
+
+    final static class UnknownCommand extends Command {
+        private final String error;
+
+        UnknownCommand(String unknownCmd) {
+            this.error = "Could not parse [" + unknownCmd + "] as a known command";
+        }
+
+        Rover execute(Rover rover) {
+            return error(rover, error);
+        }
+
+        @Override
+        protected String asString() {
+            return "unknown";
+        }
+    }
+
+    final static class TurnRight extends Command {
+        Rover execute(Rover rover) {
+            return turn(rover, rover.orientation.turnRight());
+        }
+
+        @Override
+        protected String asString() {
+            return "right";
+        }
+    }
+
+    final static class TurnLeft extends Command {
+        Rover execute(Rover rover) {
+            return turn(rover, rover.orientation.turnLeft());
+        }
+
+        @Override
+        protected String asString() {
+            return "left";
+        }
+    }
+
+    final static class Forwards extends Command {
+        Rover execute(Rover rover) {
+            return rover.scan()
+                    .map(obstacle -> stop(rover, obstacle))
+                    .orElse(move(rover, rover.position.plus(asVector(rover.orientation))));
+        }
+
+        @Override
+        protected String asString() {
+            return "forwards";
+        }
+    }
+
+    final static class Backwards extends Command {
+        Rover execute(Rover rover) {
+            return move(rover, rover.position.plus(asVector(rover.orientation).reversed()));
+        }
+
+        @Override
+        protected String asString() {
+            return "backwards";
+        }
+    }
+
+    final static class Ignored extends Command {
+        private final Command ignoredCommand;
+
+        Ignored(final Command ignoredCommand) {
+            this.ignoredCommand = ignoredCommand;
+        }
+
+        Rover execute(Rover rover) {
+            return error(rover, this.asString());
+        }
+
+        @Override
+        protected String asString() {
+            return String.format("Ignored %s.", ignoredCommand.asString());
         }
     }
 }

@@ -6,6 +6,7 @@ import be.swsb.coderetreat.vector.Vector;
 import org.junit.jupiter.api.Test;
 
 import java.util.Optional;
+import java.util.function.Function;
 
 import static be.swsb.coderetreat.rover.Orientation.*;
 import static be.swsb.coderetreat.rover.Orientation.EAST;
@@ -25,10 +26,11 @@ public class RoverTest {
     void roverCanTurnRight() {
         final var rover = Rover.defaultRover();
 
-        assertThat(rover.receive("r")).isEqualTo(Rover.initialRover(new Vector(0, 0), EAST));
-        assertThat(rover.receive("r,r")).isEqualTo(Rover.initialRover(new Vector(0, 0), SOUTH));
-        assertThat(rover.receive("r,r,r")).isEqualTo(Rover.initialRover(new Vector(0, 0), WEST));
-        assertThat(rover.receive("r,r,r,r")).isEqualTo(Rover.initialRover(new Vector(0, 0), NORTH));
+        final var initialPosition = new Vector(0, 0);
+        assertThat(rover.receive("r")).isEqualTo(Rover.initialRover(initialPosition, EAST));
+        assertThat(rover.receive("r,r")).isEqualTo(Rover.initialRover(initialPosition, SOUTH));
+        assertThat(rover.receive("r,r,r")).isEqualTo(Rover.initialRover(initialPosition, WEST));
+        assertThat(rover.receive("r,r,r,r")).isEqualTo(Rover.initialRover(initialPosition, NORTH));
     }
 
     @Test
@@ -39,6 +41,12 @@ public class RoverTest {
         assertThat(rover.receive("l,l")).isEqualTo(Rover.initialRover(new Vector(0, 0), SOUTH));
         assertThat(rover.receive("l,l,l")).isEqualTo(Rover.initialRover(new Vector(0, 0), EAST));
         assertThat(rover.receive("l,l,l,l")).isEqualTo(Rover.initialRover(new Vector(0, 0), NORTH));
+    }
+
+    @Test
+    void forwards() {
+        final var rover = Rover.initialRover(new Vector(0,0), NORTH);
+        assertThat(rover.receive("f")).isEqualTo(Rover.initialRover(new Vector(0,1), NORTH));
     }
 
     @Test
@@ -90,6 +98,24 @@ public class RoverTest {
         final var rover = Rover.aDefaultRoverWithScanner(r -> Optional.of("big crater"));
 
         assertThat(rover.receive("f").report()).contains("There's a big crater! Ignoring other commands");
+    }
+
+    @Test
+    void aRoverStopsInterpretingCommandsWhenItsEncounteredAnObstacle() {
+        final var rover = Rover.aDefaultRoverWithScanner(scannerThatReturnsAnObstacleWhenMovingNorthFrom_0_4());
+
+        final var obstacleEncounteredRover = rover.receive("f,f,f,f,f,f,l,b");
+        assertThat(obstacleEncounteredRover).isEqualTo(Rover.initialRover(new Vector(0, 4), NORTH));
+        assertThat(obstacleEncounteredRover.report())
+                .contains("There's a big crater! Ignoring other commands.")
+                .contains("Ignored forwards.")
+                .contains("Ignored left.")
+                .contains("Ignored backwards.")
+        ;
+    }
+
+    private Function<Rover, Optional<String>> scannerThatReturnsAnObstacleWhenMovingNorthFrom_0_4() {
+        return r -> r.equals(Rover.initialRover(new Vector(0, 4), NORTH)) ? Optional.of("big crater") : Optional.empty();
     }
 }
 
